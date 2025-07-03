@@ -1,0 +1,86 @@
+// Install prometheus di linux
+- Download dulu prometheus dari website resmi
+- Kemudian ekstrak file nya
+- Kemudian prometheus akan dijalankan sebagai service daemon (systemd)
+  - Pertama bikin user prometheus
+    - sudo groupadd --system prometheus (buat group prometheus)
+    - sudo useradd --system -s /sbin/nologin -g prometheus prometheus (bikin user prometheus dan dimasukkan ke group prometheus)
+  - Kemudian pindahkan binary file (executable file) ke folder /usr/local/bin (biar bisa langsung di eksekusi)
+    - sudo mv prometheus promtool /use/local/bin
+  - Kemudian buat folder untuk menyimpan file konfigurasi
+    - sudo mkdir /etc/prometheus
+  - Buat folder untuk menyimpan time series database
+    - sudo mkdir /var/lib/prometheus
+  - Rubah ownership folder /var/lib/prometheus
+    - sudo chown -R prometheus:prometheus /var/lib/promettheus
+  - Kemudian pindah folder dan file konfigurasi ke folder /etc/prometheus
+    - sudo mv consoles/ console_libraries/ prometheus.yml /etc/prometheus
+  - Kemudian masuk ke direktori prometheus
+    - cd /etc/prometheus
+    - cek konfigurasi prometheus dengan sudo nano prometheus.yml
+    - di dalam nya ada setingan untuk perangkat yang akan dimonitor. jika sudah keluar dari nano
+  - Kemudian buat konfigurasi untuk service daemon prometheus dengan membuat file service di folder /etc/systemd/system
+    - sudo nano /etc/systemd/system/prometheus.service
+    - isi dari file service nya terdiri dari 3 bagian, tetapi bagian yg terpenting adalah bagian service
+      
+      [Unit]
+      Description=Prometheus
+      Documentation=https://prometheus.io/docs/introduction/overview/
+      Wants=network-online.target
+      After=network-online.target
+
+      [Service]
+      User=Prometheus
+      Group=Prometheus
+      Type=simple
+      ExecStart=/usr/local/bin/prometheus \
+      --config.file /etc/prometheus/prometheus.yml \
+      --storage.tsdb.path /var/lib/prometheus/ \
+      --web.console.templates=/etc/prometheus/consoles \
+      --web.console.libraries=/etc/prometheus/console_libraries
+
+      [Install]
+      WantedBy=multi-user.target
+    
+    - Kemudian save file dan keluar
+    - Kemudian reload system daemon dengan perintah
+      - sudo systemctl daemon-reload
+    - Kemudian kita enable service nya supaya jika komputer restart service otomatis diload
+      - sudo systemctl enable --now prometheus.service
+    - Prometheus running di port 9090. Kita bisa validasi kebenarannya dengan perintah
+      - sudo lsof -n -i | grep prometheus
+    - Install prometheus sudah selesai
+
+  // Install Node exporter
+    - Ekstrak file nya
+    - Kemudian masuk ke direktori nya. Akan ada 1 file binary (executable)
+    - Kemudian kita akan buat service daemon untuk node exporter
+      - Pertama pindahkan file binary
+        sudo mv node_exporter /usr/local/bin
+    - Kemudian buatkan file service daemonnya
+      sudo nano /etc/systemd/system/node-exporter.service
+      isi file nya adalah
+    
+      [Unit]
+      Description=Prometheus exporter for machine metrics
+
+      [Service]
+      Restart=always
+      User=Prometheus
+      ExecStart=/usr/local/bin/node_exporter
+      ExecReload=/bin/kill -HUP $MAINPID
+      TimeoutStopSec=20s
+      SendSIGKILL=no
+
+      [Install]
+      WantedBy=multi-user.target
+    
+    - Kemudian save file
+    - Kemudian reload daemon
+      sudo systemctl daemon-reload
+    - Kemudian enable service daemon node exporter
+      sudo systemctl enable --now node-exporter.service
+    - Install node exporter selesai. Node exporter running di port 9100
+
+  // Kemudian tinggal menambahkan job di konfigurasi prometheus.yml dengan cara menambahkan target di bagian scrape_configs untuk bisa dimonitoring di prometheus
+  // Kemudian untuk menampilkan tampilan grafik nya dibutuhkan Grafana. Untuk install Grafana disa dilihat di website resminya
