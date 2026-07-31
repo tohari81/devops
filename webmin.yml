@@ -1,0 +1,56 @@
+- name: Install Webmin using official setup-repos.sh
+  hosts: webmin
+  become: true
+
+  vars:
+    webmin_setup_script: "https://raw.githubusercontent.com/webmin/webmin/master/setup-repos.sh"
+
+  tasks:
+    - name: Update apt cache
+      apt:
+        update_cache: yes
+        cache_valid_time: 3600
+
+    - name: Install required packages
+      apt:
+        name:
+          - curl
+          - wget
+        state: present
+
+    - name: Download Webmin repository setup script
+      get_url:
+        url: "{{ webmin_setup_script }}"
+        dest: /tmp/setup-repos.sh
+        mode: '0755'
+
+    - name: Run Webmin repository setup script
+      command: /bin/sh /tmp/setup-repos.sh
+      args:
+        creates: /etc/apt/sources.list.d/webmin.list
+
+    - name: Update apt cache after repository setup
+      apt:
+        update_cache: yes
+
+    - name: Install Webmin
+      apt:
+        name: webmin
+        state: present
+
+    - name: Ensure Webmin service is enabled and running
+      systemd:
+        name: webmin
+        state: started
+        enabled: yes
+
+    - name: Open Webmin port (10000) if UFW is installed
+      ufw:
+        rule: allow
+        port: "10000"
+        proto: tcp
+      ignore_errors: true
+
+    - name: Show Webmin URL
+      debug:
+        msg: "Webmin dapat diakses di https://{{ inventory_hostname }}:10000"
