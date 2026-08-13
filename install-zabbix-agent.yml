@@ -1,0 +1,70 @@
+---
+- name: Install Zabbix Agent on Ubuntu
+  hosts: zabbix_clients
+  become: true
+  gather_facts: true
+
+  vars:
+    zabbix_version: "7.0"
+    zabbix_server: "192.168.1.10"
+    zabbix_agent_hostname: "{{ inventory_hostname }}"
+
+    zabbix_repo_url: "https://repo.zabbix.com/zabbix/{{ zabbix_version }}/ubuntu/pool/main/z/zabbix-release/zabbix-release_latest_{{ zabbix_version }}+ubuntu{{ ansible_distribution_version }}_all.deb"
+
+  tasks:
+
+    - name: Check Ubuntu version
+      ansible.builtin.assert:
+        that:
+          - ansible_distribution == "Ubuntu"
+          - ansible_distribution_version is version('20.04', '>=')
+        fail_msg: "Playbook ini membutuhkan Ubuntu 20.04 atau lebih baru."
+
+    - name: Install prerequisite packages
+      ansible.builtin.apt:
+        name:
+          - wget
+          - ca-certificates
+        state: present
+        update_cache: true
+
+    - name: Download Zabbix repository package
+      ansible.builtin.get_url:
+        url: "{{ zabbix_repo_url }}"
+        dest: "/tmp/zabbix-release.deb"
+        mode: "0644"
+
+    - name: Install Zabbix repository
+      ansible.builtin.apt:
+        deb: "/tmp/zabbix-release.deb"
+
+    - name: Update apt cache
+      ansible.builtin.apt:
+        update_cache: true
+
+    - name: Install Zabbix Agent
+      ansible.builtin.apt:
+        name: zabbix-agent
+        state: present
+
+    - name: Configure Zabbix Agent
+      ansible.builtin.template:
+        src: zabbix_agentd.conf.j2
+        dest: /etc/zabbix/zabbix_agentd.conf
+        owner: root
+        group: root
+        mode: "0644"
+      notify: Restart Zabbix Agent
+
+    - name: Enable and start Zabbix Agent
+      ansible.builtin.systemd:
+        name: zabbix-agent
+        enabled: true
+        state: started
+
+  handlers:
+
+    - name: Restart Zabbix Agent
+      ansible.builtin.systemd:
+        name: zabbix-agent
+        state: restarted
